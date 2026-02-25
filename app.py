@@ -95,19 +95,36 @@ def seed_csv_users():
 # ── DB helpers ──────────────────────────────────────────────
 
 def get_user_interactions(user_id: str) -> list:
+    # Pull DB interactions (new purchases made in the app)
     with get_db() as conn:
         rows = conn.execute(
             "SELECT product_id FROM interactions WHERE user_id=? ORDER BY interacted_at ASC",
             (user_id,)
         ).fetchall()
-    return [r["product_id"] for r in rows]
+    db_pids = [r["product_id"] for r in rows]
+
+    # Also include CSV history for existing users
+    csv_pids = df_interactions[df_interactions["user_id"] == user_id]["product_id"].tolist()
+
+    # Merge: CSV first (historical), DB at the end (most recent)
+    # so user_products[-1] always = the last thing they actually bought
+    seen = set()
+    merged = []
+    for pid in csv_pids:
+        if pid not in seen:
+            seen.add(pid)
+            merged.append(pid)
+    for pid in db_pids:
+        if pid in seen:
+            merged = [p for p in merged if p != pid]  # remove from old position
+        seen.add(pid)
+        merged.append(pid)  # always at the end
+
+    return merged
 
 
 def get_user_interaction_count(user_id: str) -> int:
-    with get_db() as conn:
-        return conn.execute(
-            "SELECT COUNT(*) FROM interactions WHERE user_id=?", (user_id,)
-        ).fetchone()[0]
+    return len(get_user_interactions(user_id))
 
 
 def get_total_db_interaction_count() -> int:
@@ -312,6 +329,22 @@ def recommend_popular(top_n: int = 12) -> list:
     return products_to_list(df_products[df_products["product_id"].isin(pids)])
 
 
+def get_random_3_from_last_category(user_product_ids: list, exclude_pids: set) -> list:
+    """Pick 3 random products from the category of the last purchased item."""
+    if not user_product_ids:
+        return []
+    last_pid = user_product_ids[-1]
+    category = get_category_for_product(last_pid)
+    if not category:
+        return []
+    pool = df_products[
+        (df_products["category"] == category) &
+        (~df_products["product_id"].isin(exclude_pids))
+    ]
+    sample = pool.sample(min(3, len(pool)), random_state=None)
+    return products_to_list(sample)
+
+
 # ── SVD recommendation ──────────────────────────────────────
 
 def recommend_svd(user_id: str, top_n: int = 12, exclude_pids: list = None) -> list:
@@ -342,9 +375,17 @@ def recommend_svd(user_id: str, top_n: int = 12, exclude_pids: list = None) -> l
             if pid in prod_ids:
                 user_preds[prod_ids.get_loc(pid)] = -np.inf
 
-    rec_indices = np.argsort(user_preds)[-top_n:][::-1]
+    rec_indices = np.argsort(user_preds)[-9:][::-1]
     rec_pids    = prod_ids[rec_indices]
-    return products_to_list(df_products[df_products["product_id"].isin(rec_pids)])
+    svd_recs    = products_to_list(df_products[df_products["product_id"].isin(rec_pids)])
+
+    # Get the actual user's purchase list to find last-bought category
+    actual_user_products = get_user_interactions(user_id)
+    exclude_cat = set(exclude_pids or []) | set(rec_pids)
+    cat3 = get_random_3_from_last_category(actual_user_products, exclude_cat)
+    cat3_ids = {p["product_id"] for p in cat3}
+    combined = cat3 + [p for p in svd_recs if p["product_id"] not in cat3_ids]
+    return combined[:12]
 
 
 # ── Find most similar CSV user (proxy SVD for new users) ────
@@ -451,8 +492,14 @@ def recommend_user_based(user_product_ids: list, top_n: int = 12) -> list:
     similar_data = df_interactions[df_interactions["user_id"].isin(similar_users)]
     counts       = similar_data["product_id"].value_counts()
     counts       = counts.drop(labels=user_product_ids, errors="ignore")
-    rec_pids     = counts.head(top_n).index
-    return products_to_list(df_products[df_products["product_id"].isin(rec_pids)])
+    rec_pids  = counts.head(9).index
+    ub_recs   = products_to_list(df_products[df_products["product_id"].isin(rec_pids)])
+
+    exclude_cat = set(rec_pids) | set(user_product_ids)
+    cat3 = get_random_3_from_last_category(user_product_ids, exclude_cat)
+    cat3_ids = {p["product_id"] for p in cat3}
+    combined = cat3 + [p for p in ub_recs if p["product_id"] not in cat3_ids]
+    return combined[:12]
 
 
 # =============================================================

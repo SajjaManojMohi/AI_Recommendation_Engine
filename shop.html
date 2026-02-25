@@ -188,6 +188,88 @@ main { padding:36px 40px 80px; max-width:1280px; margin:0 auto; }
 .fade-up { animation:fadeUp .32s ease both; }
 #page-purchased { display:none; }
 #page-shop.hidden { display:none; }
+
+/* CART QUANTITY */
+.ci-info { flex:1; min-width:0; }
+.ci-qty  { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.ci-qty button { width:22px; height:22px; border:1px solid var(--border); background:#fff; border-radius:4px; font-size:.85rem; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; }
+.ci-qty button:hover { background:var(--hover); }
+.ci-qty span { font-size:.8rem; font-weight:600; min-width:16px; text-align:center; }
+.ci-subtotal { font-size:.78rem; color:var(--mid); margin-top:2px; }
+
+/* PAYMENT MODAL */
+.pay-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.45);
+  display:flex; align-items:center; justify-content:center;
+  z-index:400; opacity:0; pointer-events:none; transition:opacity .22s;
+}
+.pay-overlay.open { opacity:1; pointer-events:all; }
+.pay-box {
+  background:#fff; border-radius:12px; width:860px; max-width:96vw; max-height:90vh;
+  overflow-y:auto; display:flex; gap:0;
+  box-shadow:0 16px 60px rgba(0,0,0,.18);
+  transform:translateY(12px); transition:transform .22s;
+}
+.pay-overlay.open .pay-box { transform:translateY(0); }
+.pay-left  { flex:1; padding:36px 32px; border-right:1px solid var(--border); }
+.pay-right { width:320px; flex-shrink:0; padding:36px 28px; background:#fafafa; border-radius:0 12px 12px 0; }
+.pay-title { font-family:var(--serif); font-size:1.4rem; margin-bottom:24px; }
+.pay-section-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--mid); font-weight:600; margin-bottom:12px; margin-top:22px; }
+.pay-section-label:first-of-type { margin-top:0; }
+.pay-methods { display:flex; gap:10px; margin-bottom:4px; }
+.pay-method {
+  flex:1; border:1px solid var(--border); border-radius:6px; padding:10px 14px;
+  display:flex; align-items:center; gap:8px; cursor:pointer; font-size:.83rem;
+  font-family:var(--sans); background:#fff; transition:border-color .13s;
+}
+.pay-method.selected { border-color:var(--black); background:#f7f7f7; }
+.pay-method input[type=radio] { accent-color:var(--black); }
+.pay-row { display:flex; gap:12px; }
+.pay-row .field { flex:1; }
+.pay-card-icon { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:1rem; color:var(--light); }
+.field-wrap { position:relative; }
+.pay-submit {
+  width:100%; padding:13px; background:var(--black); color:#fff;
+  border:none; border-radius:var(--r); font-family:var(--sans);
+  font-size:.9rem; font-weight:500; cursor:pointer; margin-top:24px;
+  transition:opacity .13s; letter-spacing:.02em;
+}
+.pay-submit:hover { opacity:.85; }
+.pay-secure { display:flex; align-items:center; gap:6px; font-size:.72rem; color:var(--light); margin-top:10px; justify-content:center; }
+
+/* ORDER SUMMARY (right side) */
+.order-item { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); align-items:center; }
+.order-item:last-of-type { border:none; }
+.order-img-wrap { position:relative; flex-shrink:0; }
+.order-img { width:52px; height:52px; object-fit:cover; border-radius:5px; background:#eee; display:block; }
+.order-qty-badge {
+  position:absolute; top:-7px; right:-7px; background:var(--mid); color:#fff;
+  border-radius:50%; width:18px; height:18px; font-size:.6rem;
+  display:flex; align-items:center; justify-content:center; font-weight:700;
+}
+.order-name { font-size:.8rem; font-weight:500; line-height:1.3; }
+.order-variant { font-size:.7rem; color:var(--light); margin-top:1px; }
+.order-price { font-size:.82rem; font-weight:600; margin-left:auto; white-space:nowrap; }
+.order-divider { border:none; border-top:1px solid var(--border); margin:14px 0; }
+.order-row { display:flex; justify-content:space-between; font-size:.82rem; margin-bottom:7px; color:var(--mid); }
+.order-row.total { font-size:.95rem; font-weight:700; color:var(--black); margin-top:10px; }
+.order-coupon { display:flex; gap:8px; margin-bottom:16px; }
+.order-coupon input {
+  flex:1; border:1px solid var(--border); border-radius:var(--r);
+  padding:8px 12px; font-family:var(--sans); font-size:.82rem; outline:none;
+}
+.order-coupon input:focus { border-color:var(--black); }
+.order-coupon button {
+  padding:8px 14px; background:var(--black); color:#fff; border:none;
+  border-radius:var(--r); font-family:var(--sans); font-size:.78rem; cursor:pointer;
+}
+
+/* SUCCESS */
+.pay-success { text-align:center; padding:48px 32px; }
+.pay-success .tick { font-size:3rem; margin-bottom:16px; }
+.pay-success h2 { font-family:var(--serif); font-size:1.5rem; margin-bottom:8px; }
+.pay-success p { font-size:.85rem; color:var(--mid); margin-bottom:24px; }
+.pay-success button { padding:10px 28px; background:var(--black); color:#fff; border:none; border-radius:var(--r); font-family:var(--sans); font-size:.85rem; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -267,6 +349,78 @@ main { padding:36px 40px 80px; max-width:1280px; margin:0 auto; }
       <div class="cart-total-row"><span>Total</span><strong id="cart-total">₹0</strong></div>
       <button class="checkout-btn" onclick="checkout()">Buy now</button>
     </div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="pay-overlay" id="pay-overlay" onclick="payBgClose(event)">
+  <div class="pay-box" id="pay-box">
+
+    <!-- LEFT: Checkout form -->
+    <div class="pay-left" id="pay-form-side">
+      <div class="pay-title">Checkout</div>
+
+      <div class="pay-section-label">Shipping address</div>
+      <div class="field"><label>Full name</label><input id="pay-name" type="text" placeholder="Rahul Sharma"></div>
+      <div class="field"><label>Address</label><input id="pay-addr" type="text" placeholder="123, MG Road, Bengaluru"></div>
+      <div class="pay-row">
+        <div class="field"><label>City</label><input id="pay-city" type="text" placeholder="Bengaluru"></div>
+        <div class="field"><label>PIN code</label><input id="pay-pin" type="text" placeholder="560001"></div>
+      </div>
+
+      <div class="pay-section-label">Payment method</div>
+      <div class="pay-methods">
+        <button class="pay-method selected" id="pm-card" onclick="selectMethod('card')">
+          <input type="radio" name="pm" checked> 💳 Credit / Debit card
+        </button>
+        <button class="pay-method" id="pm-upi" onclick="selectMethod('upi')">
+          <input type="radio" name="pm"> 📱 UPI
+        </button>
+      </div>
+
+      <!-- Card fields -->
+      <div id="card-fields">
+        <div class="pay-section-label">Card details</div>
+        <div class="field"><label>Name on card</label><input id="pay-cname" type="text" placeholder="Rahul Sharma"></div>
+        <div class="field field-wrap">
+          <label>Card number</label>
+          <input id="pay-cnum" type="text" placeholder="1234  5678  9012  3456" maxlength="19"
+                 oninput="fmtCard(this)">
+        </div>
+        <div class="pay-row">
+          <div class="field"><label>Expiry</label><input id="pay-exp" type="text" placeholder="MM / YY" maxlength="7" oninput="fmtExp(this)"></div>
+          <div class="field"><label>CVV</label><input id="pay-cvv" type="password" placeholder="•••" maxlength="4"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--mid);margin-top:4px;cursor:pointer;">
+          <input type="checkbox" style="accent-color:var(--black)"> Save card for faster checkout
+        </label>
+      </div>
+
+      <!-- UPI fields -->
+      <div id="upi-fields" style="display:none">
+        <div class="pay-section-label">UPI ID</div>
+        <div class="field"><label>Enter UPI ID</label><input type="text" placeholder="yourname@upi"></div>
+      </div>
+
+      <button class="pay-submit" id="pay-btn" onclick="doPayment()">Pay ₹<span id="pay-amount">0</span></button>
+      <div class="pay-secure">🔒 Secured by 256-bit SSL encryption</div>
+    </div>
+
+    <!-- RIGHT: Order summary -->
+    <div class="pay-right">
+      <div class="pay-title" style="font-size:1.1rem">Order summary</div>
+      <div id="order-items"></div>
+      <hr class="order-divider">
+      <div class="order-coupon">
+        <input type="text" placeholder="Coupon code" id="coupon-input">
+        <button onclick="applyCoupon()">Apply</button>
+      </div>
+      <div class="order-row"><span>Subtotal</span><span id="ord-sub">₹0</span></div>
+      <div class="order-row"><span>Delivery</span><span id="ord-del">₹0</span></div>
+      <div class="order-row" id="ord-disc-row" style="display:none;color:#2a9d5c"><span>Discount</span><span id="ord-disc"></span></div>
+      <div class="order-row total"><span>Total</span><span id="ord-total">₹0</span></div>
+    </div>
+
   </div>
 </div>
 
@@ -369,8 +523,8 @@ async function loadRecommendations() {
   row.innerHTML = '<div class="loader">Loading…</div>';
 
   const url = currentUser
-    ? `${API}/api/recommendations?user_id=${encodeURIComponent(currentUser)}&top_n=14`
-    : `${API}/api/recommendations?top_n=14`;
+    ? `${API}/api/recommendations?user_id=${encodeURIComponent(currentUser)}&top_n=12`
+    : `${API}/api/recommendations?top_n=12`;
 
   const METHOD_LABEL = {
     svd:        "Personalised · SVD model",
@@ -455,13 +609,23 @@ function refreshButtons(pid) {
 
 // ── CART ──────────────────────────────────────────────
 function addToCart(product) {
-  if (cart.some(c=>c.product.product_id===product.product_id)) return;
-  cart.push({product}); updateBadge(); renderCartBody();
+  const existing = cart.find(c=>c.product.product_id===product.product_id);
+  if (existing) { existing.qty++; }
+  else { cart.push({product, qty:1}); }
+  updateBadge(); renderCartBody();
 }
 
 function removeFromCart(pid) {
   cart=cart.filter(c=>c.product.product_id!==pid);
   updateBadge(); renderCartBody(); refreshButtons(pid);
+}
+
+function changeQty(pid, delta) {
+  const item = cart.find(c=>c.product.product_id===pid);
+  if (!item) return;
+  item.qty += delta;
+  if (item.qty <= 0) { removeFromCart(pid); return; }
+  updateBadge(); renderCartBody();
 }
 
 function renderCartBody() {
@@ -474,13 +638,19 @@ function renderCartBody() {
     <div class="cart-item">
       <img class="ci-img" src="${c.product.image_url}" alt=""
            onerror="this.style.background='#eee';this.removeAttribute('src')">
-      <div>
+      <div class="ci-info">
         <div class="ci-name">${c.product.product_name}</div>
-        <div class="ci-price">₹${Number(c.product.price).toLocaleString()}</div>
+        <div class="ci-price">${c.product.brand} · ${c.product.category}</div>
+        <div class="ci-qty">
+          <button onclick="changeQty('${c.product.product_id}',-1)">−</button>
+          <span>${c.qty}</span>
+          <button onclick="changeQty('${c.product.product_id}',1)">+</button>
+        </div>
+        <div class="ci-subtotal">₹${(Number(c.product.price)*c.qty).toLocaleString()}</div>
         <button class="ci-rm" onclick="removeFromCart('${c.product.product_id}')">Remove</button>
       </div>
     </div>`).join("");
-  const total=cart.reduce((s,c)=>s+Number(c.product.price),0);
+  const total=cart.reduce((s,c)=>s+Number(c.product.price)*c.qty,0);
   document.getElementById("cart-total").textContent=`₹${total.toLocaleString()}`;
 }
 
@@ -490,16 +660,130 @@ function cartBgClose(e){ if(e.target.id==="cart-overlay") closeCart(); }
 
 async function checkout() {
   if (!cart.length) return;
+  closeCart();
+  openPayment();
+}
+
+// ── PAYMENT MODAL ─────────────────────────────────────
+let couponApplied = false;
+
+let payBoxHTML = null;
+
+function openPayment() {
+  const box = document.getElementById("pay-box");
+  // Save original HTML once
+  if (!payBoxHTML) payBoxHTML = box.innerHTML;
+  // Always restore to original before opening
+  box.innerHTML = payBoxHTML;
+  renderOrderSummary();
+  couponApplied = false;
+  document.getElementById("ord-disc-row").style.display = "none";
+  document.getElementById("coupon-input").value = "";
+  document.getElementById("pay-overlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closePayment() {
+  document.getElementById("pay-overlay").classList.remove("open");
+  document.body.style.overflow="";
+  couponApplied=false;
+  document.getElementById("ord-disc-row").style.display="none";
+  document.getElementById("coupon-input").value="";
+}
+
+function payBgClose(e) { if(e.target.id==="pay-overlay") closePayment(); }
+
+function renderOrderSummary() {
+  const el = document.getElementById("order-items");
+  el.innerHTML = cart.map(c=>`
+    <div class="order-item">
+      <div class="order-img-wrap">
+        <img class="order-img" src="${c.product.image_url}" alt=""
+             onerror="this.style.background='#eee';this.removeAttribute('src')">
+        <span class="order-qty-badge">${c.qty}</span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="order-name">${c.product.product_name}</div>
+        <div class="order-variant">${c.product.brand} · ${c.product.category}</div>
+      </div>
+      <div class="order-price">₹${(Number(c.product.price)*c.qty).toLocaleString()}</div>
+    </div>`).join("");
+
+  const subtotal = cart.reduce((s,c)=>s+Number(c.product.price)*c.qty, 0);
+  const delivery = subtotal > 500 ? 0 : 49;
+  const discount = couponApplied ? Math.round(subtotal*0.1) : 0;
+  const total = subtotal + delivery - discount;
+
+  document.getElementById("ord-sub").textContent   = `₹${subtotal.toLocaleString()}`;
+  document.getElementById("ord-del").textContent   = delivery===0 ? "FREE" : `₹${delivery}`;
+  document.getElementById("ord-total").textContent = `₹${total.toLocaleString()}`;
+  document.getElementById("pay-amount").textContent = total.toLocaleString();
+
+  if (couponApplied) {
+    document.getElementById("ord-disc-row").style.display="flex";
+    document.getElementById("ord-disc").textContent = `-₹${discount.toLocaleString()}`;
+  }
+}
+
+function applyCoupon() {
+  const code = document.getElementById("coupon-input").value.trim().toUpperCase();
+  if (code==="SAVE10" && !couponApplied) {
+    couponApplied=true; renderOrderSummary();
+    document.getElementById("coupon-input").style.borderColor="#2a9d5c";
+  } else if (couponApplied) {
+    alert("Coupon already applied!");
+  } else {
+    alert("Invalid coupon. Try SAVE10");
+  }
+}
+
+function selectMethod(m) {
+  document.getElementById("pm-card").classList.toggle("selected", m==="card");
+  document.getElementById("pm-upi").classList.toggle("selected",  m==="upi");
+  document.getElementById("card-fields").style.display = m==="card" ? "" : "none";
+  document.getElementById("upi-fields").style.display  = m==="upi"  ? "" : "none";
+}
+
+function fmtCard(el) {
+  let v = el.value.replace(/\D/g,"").slice(0,16);
+  el.value = v.match(/.{1,4}/g)?.join("  ")||v;
+}
+function fmtExp(el) {
+  let v = el.value.replace(/\D/g,"").slice(0,4);
+  if (v.length>=3) v = v.slice(0,2)+" / "+v.slice(2);
+  el.value=v;
+}
+
+async function doPayment() {
+  const btn = document.getElementById("pay-btn");
+  btn.textContent="Processing…"; btn.disabled=true;
+
+  // Save interactions to backend (UI only change — backend call unchanged)
   for (const c of cart) {
     const pid = c.product.product_id;
     if (!purchased.some(p=>p.product.product_id===pid))
       purchased.push({product:c.product, rating:sessionRatings[pid]||0});
-    if (currentUser && isNewUser) {
+    if (currentUser) {
       await fetch(`${API}/api/interact`,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({user_id:currentUser,product_id:pid,rating:5})}).catch(()=>{});
     }
   }
-  cart=[]; updateBadge(); renderCartBody(); closeCart(); renderPurchased();
+
+  await new Promise(r=>setTimeout(r,1200)); // simulate processing
+
+  // Show success
+  const box = document.getElementById("pay-box");
+  const total = document.getElementById("ord-total").textContent;
+  box.innerHTML=`
+    <div class="pay-success">
+      <div class="tick">✅</div>
+      <h2>Payment successful!</h2>
+      <p>Your order of <strong>${total}</strong> has been placed.<br>
+         You'll receive a confirmation shortly.</p>
+      <button onclick="closePayment();renderPurchased();">View purchases</button>
+    </div>`;
+
+  cart=[]; updateBadge(); renderCartBody();
   setTimeout(()=>loadRecommendations(), 400);
 }
 
@@ -533,7 +817,7 @@ async function rate(pid, rating) {
   const sl=document.getElementById(`sl-${pid}`);
   if(sr) sr.innerHTML=[1,2,3,4,5].map(n=>`<button class="star${rating>=n?" on":""}" onclick="rate('${pid}',${n})">★</button>`).join("");
   if(sl) sl.textContent=`Rated ${rating}/5`;
-  if (currentUser && isNewUser) {
+  if (currentUser) {
     await fetch(`${API}/api/interact`,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({user_id:currentUser,product_id:pid,rating})}).catch(()=>{});
     loadRecommendations();
