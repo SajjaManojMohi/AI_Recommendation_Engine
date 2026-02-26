@@ -270,6 +270,58 @@ main { padding:36px 40px 80px; max-width:1280px; margin:0 auto; }
 .pay-success h2 { font-family:var(--serif); font-size:1.5rem; margin-bottom:8px; }
 .pay-success p { font-size:.85rem; color:var(--mid); margin-bottom:24px; }
 .pay-success button { padding:10px 28px; background:var(--black); color:#fff; border:none; border-radius:var(--r); font-family:var(--sans); font-size:.85rem; cursor:pointer; }
+
+/* PRODUCT POPUP */
+.product-popup-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.38);
+  display:flex; align-items:center; justify-content:center;
+  z-index:350; opacity:0; pointer-events:none; transition:opacity .22s;
+}
+.product-popup-overlay.open { opacity:1; pointer-events:all; }
+.product-popup {
+  background:#fff; border-radius:10px; width:720px; max-width:95vw; max-height:90vh;
+  display:flex; overflow:hidden;
+  box-shadow:0 16px 60px rgba(0,0,0,.18);
+  transform:translateY(12px); transition:transform .22s;
+}
+.product-popup-overlay.open .product-popup { transform:translateY(0); }
+.popup-img-side {
+  width:300px; flex-shrink:0; background:#f4f4f4;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.popup-img-side img { width:100%; height:100%; object-fit:cover; display:block; }
+.popup-info-side {
+  flex:1; padding:32px 28px; overflow-y:auto;
+  display:flex; flex-direction:column;
+}
+.popup-back {
+  background:none; border:none; font-size:.8rem; color:var(--mid);
+  cursor:pointer; padding:0; margin-bottom:18px; display:flex; align-items:center; gap:5px;
+  font-family:var(--sans); transition:color .12s; align-self:flex-start;
+}
+.popup-back:hover { color:var(--black); }
+.popup-brand { font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; color:var(--light); font-weight:500; margin-bottom:4px; }
+.popup-name  { font-family:var(--serif); font-size:1.35rem; line-height:1.25; margin-bottom:8px; }
+.popup-price { font-size:1.15rem; font-weight:600; margin-bottom:14px; }
+.popup-instock {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:.76rem; color:#2a9d5c; font-weight:500; margin-bottom:18px;
+}
+.popup-instock::before { content:''; width:7px; height:7px; background:#2a9d5c; border-radius:50%; display:inline-block; }
+.popup-desc-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--mid); font-weight:600; margin-bottom:7px; }
+.popup-desc  { font-size:.84rem; color:#444; line-height:1.6; flex:1; margin-bottom:22px; }
+.popup-add {
+  width:100%; padding:12px; background:var(--black); color:#fff;
+  border:none; border-radius:var(--r); font-family:var(--sans);
+  font-size:.86rem; font-weight:500; cursor:pointer; letter-spacing:.02em;
+  transition:opacity .13s;
+}
+.popup-add:hover { opacity:.82; }
+.popup-add.in-cart { background:#f0f0f0; color:var(--black); }
+@media (max-width:580px) {
+  .product-popup { flex-direction:column; max-height:92vh; }
+  .popup-img-side { width:100%; height:200px; flex-shrink:0; }
+}
 </style>
 </head>
 <body>
@@ -309,6 +361,25 @@ main { padding:36px 40px 80px; max-width:1280px; margin:0 auto; }
     <div class="p-grid" id="purchased-grid"></div>
     <div class="empty-state" id="purchased-empty" style="display:none">Nothing purchased yet.</div>
   </main>
+</div>
+
+<!-- PRODUCT POPUP -->
+<div class="product-popup-overlay" id="product-popup-overlay" onclick="popupBgClose(event)">
+  <div class="product-popup" id="product-popup">
+    <div class="popup-img-side">
+      <img id="popup-img" src="" alt="" onerror="this.onerror=null;if(window._popupProduct){this.src=getProductImage(window._popupProduct.product_id,window._popupProduct.product_name,window._popupProduct.category);}"">
+    </div>
+    <div class="popup-info-side">
+      <button class="popup-back" onclick="closeProductPopup()">← Back</button>
+      <div class="popup-brand" id="popup-brand"></div>
+      <div class="popup-name"  id="popup-name"></div>
+      <div class="popup-price" id="popup-price"></div>
+      <div class="popup-instock">In stock · ready to ship</div>
+      <div class="popup-desc-label">Description</div>
+      <div class="popup-desc"  id="popup-desc"></div>
+      <button class="popup-add" id="popup-add-btn" onclick="popupAddToCart()">Add to cart</button>
+    </div>
+  </div>
 </div>
 
 <!-- AUTH MODAL -->
@@ -576,6 +647,49 @@ async function loadCategoryRows() {
   }
 }
 
+// ── PRODUCT IMAGE FALLBACK ────────────────────────────
+// Used as onerror fallback when image_url fails to load.
+function getProductImage(productId, name, category) {
+  const n = (name || '').toLowerCase();
+  let keyword;
+  if (n.includes('macbook') || n.includes('laptop'))           keyword = 'laptop,computer';
+  else if (n.includes('iphone') || n.includes('smartphone'))   keyword = 'smartphone,phone';
+  else if (n.includes('ipad') || n.includes('tablet'))         keyword = 'tablet,ipad';
+  else if (n.includes('airpods') || n.includes('earbuds'))     keyword = 'earbuds,earphones';
+  else if (n.includes('headphones'))                           keyword = 'headphones';
+  else if (n.includes('watch'))                                keyword = 'smartwatch';
+  else if (n.includes('camera'))                               keyword = 'camera,photography';
+  else if (n.includes('monitor') || n.includes('tv'))          keyword = 'monitor,screen';
+  else if (n.includes('keyboard'))                             keyword = 'keyboard';
+  else if (n.includes('shoes') || n.includes('sneakers') || n.includes('boots')) keyword = 'shoes,footwear';
+  else if (n.includes('hoodie') || n.includes('sweatshirt'))   keyword = 'hoodie';
+  else if (n.includes('t-shirt') || n.includes('tshirt'))      keyword = 'tshirt,fashion';
+  else if (n.includes('jeans') || n.includes('denim'))         keyword = 'jeans';
+  else if (n.includes('jacket'))                               keyword = 'jacket,fashion';
+  else if (n.includes('shirt'))                                keyword = 'shirt,fashion';
+  else if (n.includes('lipstick'))                             keyword = 'lipstick,makeup';
+  else if (n.includes('foundation') || n.includes('mascara'))  keyword = 'makeup,cosmetics';
+  else if (n.includes('serum') || n.includes('moistur'))       keyword = 'skincare';
+  else if (n.includes('bed'))                                  keyword = 'bedroom,bed';
+  else if (n.includes('sofa') || n.includes('couch'))          keyword = 'sofa';
+  else if (n.includes('chair'))                                keyword = 'chair,furniture';
+  else if (n.includes('desk'))                                 keyword = 'desk,workspace';
+  else if (n.includes('table'))                                keyword = 'table,furniture';
+  else if (n.includes('dumbbell') || n.includes('weight'))     keyword = 'gym,fitness';
+  else if (n.includes('yoga') || n.includes('mat'))            keyword = 'yoga';
+  else {
+    const c = (category || '').toLowerCase();
+    if (c.includes('electronic'))  keyword = 'technology,gadget';
+    else if (c.includes('fashion')) keyword = 'fashion,clothing';
+    else if (c.includes('beauty'))  keyword = 'beauty,cosmetics';
+    else if (c.includes('home'))    keyword = 'home,furniture';
+    else if (c.includes('sport'))   keyword = 'sport,fitness';
+    else keyword = 'product,shopping';
+  }
+  const lockNum = parseInt((productId || '1').replace(/\D/g,'')) || 1;
+  return `https://loremflickr.com/400/400/${keyword}?lock=${lockNum}`;
+}
+
 // ── CARD ──────────────────────────────────────────────
 function makeCard(p, wide) {
   const inCart = cart.some(c=>c.product.product_id===p.product_id);
@@ -583,7 +697,7 @@ function makeCard(p, wide) {
   div.className = `card${wide?" wide":""}`;
   div.innerHTML = `
     <img class="card-img" src="${p.image_url}" alt="${p.product_name}" loading="lazy"
-         onerror="this.style.background='#eee';this.removeAttribute('src')">
+         onerror="this.onerror=null;this.src=getProductImage('${p.product_id}','${p.product_name}','${p.category}')">
     <div class="card-body">
       <div class="card-brand">${p.brand}</div>
       <div class="card-name">${p.product_name}</div>
@@ -596,6 +710,11 @@ function makeCard(p, wide) {
   div.querySelector(".card-add").addEventListener("click", e=>{
     e.stopPropagation(); addToCart(p);
   });
+  // Click anywhere on card (except Add to Cart) opens popup
+  div.addEventListener("click", e=>{
+    if (!e.target.classList.contains("card-add")) openProductPopup(p);
+  });
+  div.style.cursor = "pointer";
   return div;
 }
 
@@ -605,6 +724,55 @@ function refreshButtons(pid) {
     btn.textContent = inCart ? "✓ In cart" : "Add to cart";
     btn.classList.toggle("in-cart", inCart);
   });
+  // Also refresh popup button if open for same product
+  const popupBtn = document.getElementById("popup-add-btn");
+  if (popupBtn && popupBtn.dataset.pid === pid) {
+    popupBtn.textContent = inCart ? "✓ In cart" : "Add to cart";
+    popupBtn.classList.toggle("in-cart", inCart);
+  }
+}
+
+// ── PRODUCT POPUP ─────────────────────────────────────
+let popupProduct = null;
+
+function openProductPopup(p) {
+  popupProduct = p;
+  window._popupProduct = p;
+  document.getElementById("popup-img").src = p.image_url || "";
+  document.getElementById("popup-img").alt = p.product_name;
+  document.getElementById("popup-brand").textContent = p.brand || "";
+  document.getElementById("popup-name").textContent  = p.product_name || "";
+  document.getElementById("popup-price").textContent = "₹" + Number(p.price).toLocaleString();
+  // Use description field if available, fallback to category info
+  const desc = p.description || p.product_description ||
+    `${p.product_name} by ${p.brand}. Category: ${p.category}. A quality product at a great price.`;
+  document.getElementById("popup-desc").textContent = desc;
+  const inCart = cart.some(c=>c.product.product_id===p.product_id);
+  const btn = document.getElementById("popup-add-btn");
+  btn.textContent = inCart ? "✓ In cart" : "Add to cart";
+  btn.classList.toggle("in-cart", inCart);
+  btn.dataset.pid = p.product_id;
+  document.getElementById("product-popup-overlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeProductPopup() {
+  document.getElementById("product-popup-overlay").classList.remove("open");
+  document.body.style.overflow = "";
+  popupProduct = null;
+}
+
+function popupBgClose(e) {
+  if (e.target.id === "product-popup-overlay") closeProductPopup();
+}
+
+function popupAddToCart() {
+  if (!popupProduct) return;
+  addToCart(popupProduct);
+  const inCart = cart.some(c=>c.product.product_id===popupProduct.product_id);
+  const btn = document.getElementById("popup-add-btn");
+  btn.textContent = inCart ? "✓ In cart" : "Add to cart";
+  btn.classList.toggle("in-cart", inCart);
 }
 
 // ── CART ──────────────────────────────────────────────
@@ -637,7 +805,7 @@ function renderCartBody() {
   el.innerHTML=cart.map(c=>`
     <div class="cart-item">
       <img class="ci-img" src="${c.product.image_url}" alt=""
-           onerror="this.style.background='#eee';this.removeAttribute('src')">
+           onerror="this.onerror=null;this.src=getProductImage('${c.product.product_id}','${c.product.product_name}','${c.product.category}')">
       <div class="ci-info">
         <div class="ci-name">${c.product.product_name}</div>
         <div class="ci-price">${c.product.brand} · ${c.product.category}</div>
@@ -699,7 +867,7 @@ function renderOrderSummary() {
     <div class="order-item">
       <div class="order-img-wrap">
         <img class="order-img" src="${c.product.image_url}" alt=""
-             onerror="this.style.background='#eee';this.removeAttribute('src')">
+             onerror="this.onerror=null;this.src=getProductImage('${c.product.product_id}','${c.product.product_name}','${c.product.category}')">
         <span class="order-qty-badge">${c.qty}</span>
       </div>
       <div style="flex:1;min-width:0">
@@ -799,7 +967,7 @@ function renderPurchased() {
     return `
       <div class="p-card">
         <img class="card-img" src="${p.image_url}" alt=""
-             onerror="this.style.background='#eee';this.removeAttribute('src')">
+             onerror="this.onerror=null;this.src=getProductImage('${p.product_id}','${p.product_name}','${p.category}')">
         <div class="card-body">
           <div class="card-brand">${p.brand}</div>
           <div class="card-name">${p.product_name}</div>
