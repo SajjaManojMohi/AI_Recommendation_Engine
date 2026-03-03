@@ -168,7 +168,7 @@ def get_all_db_interactions() -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["user_id", "product_id", "rating"])
 
 # =============================================================
-#  LOAD CSV DATA
+#  LOAD CSV DATA  (fast — just reading files, safe at import time)
 # =============================================================
 df_interactions = pd.read_csv(os.path.join(BASE, "users_interactions.csv"))
 df_products     = pd.read_csv(os.path.join(BASE, "products_catalog.csv"))
@@ -181,11 +181,12 @@ existing_users = set(df_interactions["user_id"].unique())
 # =============================================================
 #  SVD STATE  –  lives in a dict so retrain can swap atomically
 # =============================================================
-# Using a dict + lock so the retrain thread can replace the matrices
-# without any request thread ever reading a half-built model.
-
 svd_lock  = threading.Lock()
-svd_state = {}   # populated by build_svd_model() below
+svd_state = {}   # populated lazily on first request
+
+# Popularity tables – also populated lazily
+product_pop        = None
+product_popularity = None
 
 
 def build_svd_model(interactions_df: pd.DataFrame):
@@ -212,7 +213,6 @@ def build_svd_model(interactions_df: pd.DataFrame):
 
     # Per-user mean (vectorized)
     user_means = np.zeros(sparse.shape[0])
-    cx = sparse.tocoo().astype(float)
     for i in range(sparse.shape[0]):
         row_data = sparse[i].data
         if len(row_data) > 0:
@@ -234,10 +234,10 @@ def build_svd_model(interactions_df: pd.DataFrame):
           f"users: {len(user_item_matrix)}  interactions: {len(merged)}")
 
     return {
-        "user_item_matrix": user_item_matrix,
-        "sparse_matrix":    sparse,
+        "user_item_matrix":  user_item_matrix,
+        "sparse_matrix":     sparse,
         "predicted_ratings": predicted,
-        "user_means":       user_means,
+        "user_means":        user_means,
     }
 
 
@@ -246,8 +246,8 @@ def retrain_svd_if_needed():
     Called after every purchase. If RETRAIN_EVERY_N new DB interactions
     have accumulated since the last retrain, trigger a background retrain.
     """
-    total   = get_total_db_interaction_count()
-    last    = get_last_retrain_count()
+    total = get_total_db_interaction_count()
+    last  = get_last_retrain_count()
 
     if total - last < RETRAIN_EVERY_N:
         return   # not enough new data yet
@@ -262,13 +262,12 @@ def _do_retrain():
         print("[SVD] retraining started...")
 
         db_df  = get_all_db_interactions()
-        # Give DB interactions a fake interacted_at so merge logic works
         db_df["interacted_at"] = "9999"
 
         csv_df = df_interactions.copy()
         csv_df["interacted_at"] = "0000"
 
-        combined = pd.concat([csv_df, db_df], ignore_index=True)
+        combined  = pd.concat([csv_df, db_df], ignore_index=True)
         new_state = build_svd_model(combined)
 
         with svd_lock:
@@ -281,37 +280,58 @@ def _do_retrain():
         print(f"[SVD] retrain failed: {e}")
 
 
-# ── Initial build (CSV only at startup) ─────────────────────
-csv_with_ts = df_interactions.copy()
-csv_with_ts["interacted_at"] = "0000"
-svd_state.update(build_svd_model(csv_with_ts))
-
-
 # =============================================================
-#  CATEGORY POPULARITY  (static — based on CSV, sufficient for session rec)
+#  LAZY STARTUP
+#  All heavy work (SVD build, popularity tables, DB init) is
+#  deferred until the first real HTTP request so that gunicorn
+#  can bind to the port and satisfy Render's health-check
+#  within the 30-second timeout window.
 # =============================================================
-product_pop = (
-    df_interactions.groupby('product_id')
-    .size()
-    .reset_index(name='interaction_count')
-)
-product_pop = product_pop.merge(df_products[['product_id', 'category']], on='product_id', how='left')
-product_pop['rank_in_category'] = (
-    product_pop.groupby('category')['interaction_count']
-    .rank(method='first', ascending=False)
-    .astype(int)
-)
-product_pop = product_pop.sort_values(['category', 'rank_in_category'])
+_startup_done = False
+_startup_lock = threading.Lock()
 
-product_popularity = df_interactions["product_id"].value_counts()
 
-print("[models] all models ready ✓")
+def _run_startup():
+    global _startup_done, product_pop, product_popularity
 
-# =============================================================
-#  INIT DB
-# =============================================================
-init_db()
-seed_csv_users()
+    with _startup_lock:
+        if _startup_done:
+            return
+        _startup_done = True
+
+    print("[startup] building models…")
+
+    # 1. SVD (the slow part)
+    csv_with_ts = df_interactions.copy()
+    csv_with_ts["interacted_at"] = "0000"
+    svd_state.update(build_svd_model(csv_with_ts))
+
+    # 2. Category popularity tables
+    _pp = (
+        df_interactions.groupby("product_id")
+        .size()
+        .reset_index(name="interaction_count")
+    )
+    _pp = _pp.merge(df_products[["product_id", "category"]], on="product_id", how="left")
+    _pp["rank_in_category"] = (
+        _pp.groupby("category")["interaction_count"]
+        .rank(method="first", ascending=False)
+        .astype(int)
+    )
+    product_pop        = _pp.sort_values(["category", "rank_in_category"])
+    product_popularity = df_interactions["product_id"].value_counts()
+
+    # 3. DB init + seed
+    init_db()
+    seed_csv_users()
+
+    print("[startup] all models ready ✓")
+
+
+@app.before_request
+def lazy_startup():
+    if not _startup_done:
+        _run_startup()
 
 
 # =============================================================
@@ -379,7 +399,6 @@ def recommend_svd(user_id: str, top_n: int = 12, exclude_pids: list = None) -> l
     rec_pids    = prod_ids[rec_indices]
     svd_recs    = products_to_list(df_products[df_products["product_id"].isin(rec_pids)])
 
-    # Get the actual user's purchase list to find last-bought category
     actual_user_products = get_user_interactions(user_id)
     exclude_cat = set(exclude_pids or []) | set(rec_pids)
     cat3 = get_random_3_from_last_category(actual_user_products, exclude_cat)
@@ -426,16 +445,16 @@ SLOT_ALLOCATION = {
 
 
 def get_category_for_product(product_id: str):
-    match = df_products.loc[df_products['product_id'] == product_id, 'category']
+    match = df_products.loc[df_products["product_id"] == product_id, "category"]
     return match.values[0] if not match.empty else None
 
 
 def get_top_products_in_category(category: str, n: int, exclude: set) -> list:
     pool = product_pop[
-        (product_pop['category'] == category) &
-        (~product_pop['product_id'].isin(exclude))
+        (product_pop["category"] == category) &
+        (~product_pop["product_id"].isin(exclude))
     ]
-    return pool.nsmallest(n, 'rank_in_category')['product_id'].tolist()
+    return pool.nsmallest(n, "rank_in_category")["product_id"].tolist()
 
 
 def recommend_session_popularity(user_product_ids: list, top_n: int = 12) -> list:
@@ -776,12 +795,12 @@ def svd_status():
         ).fetchone()
     total = get_total_db_interaction_count()
     return jsonify({
-        "total_db_interactions":  total,
-        "last_retrain_count":     meta["last_retrain_count"],
-        "last_retrained_at":      meta["last_retrained_at"],
+        "total_db_interactions":      total,
+        "last_retrain_count":         meta["last_retrain_count"],
+        "last_retrained_at":          meta["last_retrained_at"],
         "interactions_since_retrain": total - meta["last_retrain_count"],
-        "retrain_every_n":        RETRAIN_EVERY_N,
-        "next_retrain_in":        RETRAIN_EVERY_N - (total - meta["last_retrain_count"])
+        "retrain_every_n":            RETRAIN_EVERY_N,
+        "next_retrain_in":            RETRAIN_EVERY_N - (total - meta["last_retrain_count"])
     })
 
 
